@@ -33,7 +33,8 @@
 
 sensor_msgs::CvBridge g_bridge;
 
-std::string directory = "/home/qboblue/Pictures/";
+std::string defaultDirectory = "/home/qboblue/Pictures/";
+std::string defaultTopic="/stereo/left/image_raw";
 std::string extension=".avi";
 std::string soundRecorder="arecord";
 std::string sExtension=".wav";
@@ -68,10 +69,14 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
   image_transport::ImageTransport it(nh);
   std::string topic = nh.resolveName("image");
+  std::string directory= nh.resolveName("recordDir");
   if (topic=="/image"){
-    topic="/stereo/left/image_raw";
+    topic=defaultTopic;
   }
-  printf("We will record this video topic: '%s'\n",topic.c_str());
+  if (directory=="/recordDir"){
+    directory=defaultDirectory;
+  }
+  printf("We will record this video topic: '%s' and the destination: %s\n",topic.c_str(), directory.c_str());
   //Set Video file name and directory
   int now=time(0);
   std::stringstream sstr;
