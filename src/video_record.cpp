@@ -37,6 +37,9 @@ std::string directory = "/home/qboblue/Pictures/";
 std::string extension=".avi";
 std::string soundRecorder="arecord";
 std::string sExtension=".wav";
+std::string combinator="mkvmerge -o ";
+std::string finalExtension=".mkv";
+std::string deleter="rm";
 int isColor = 1;
 int fps     = 30; 
 int frameW  = 480; 
@@ -60,12 +63,16 @@ void callback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::Camera
 
 int main(int argc, char** argv)
 {
+  //Init ROS
   ros::init(argc, argv, "qbo_record_video", ros::init_options::AnonymousName);
   ros::NodeHandle nh;
   image_transport::ImageTransport it(nh);
   std::string topic = nh.resolveName("image");
-
-
+  if (topic=="/image"){
+    topic="/stereo/left/image_raw";
+  }
+  printf("We will record this video topic: '%s'\n",topic.c_str());
+  //Set Video file name and directory
   int now=time(0);
   std::stringstream sstr;
   sstr << now;
@@ -73,16 +80,51 @@ int main(int argc, char** argv)
   std::string file=directory+filename+extension;
   const char * f=file.c_str();
 
+  //Set audio command, file name and directory
   std::string sound=soundRecorder+" "+directory+filename+sExtension;
   const char * soundCommand=sound.c_str();
 
+  //Set combining command, filename and directory
+  std::string combi=combinator+" "+directory+filename+finalExtension+" "+directory+filename+sExtension+" "+directory+filename+extension;
+  const char * combiCommand=combi.c_str();
+
+  //Set remove command
+  std::string rm=deleter+" "+directory+filename+sExtension+" "+directory+filename+extension;
+  const char * removeCommand=rm.c_str();
+
+  //Define Video file
   writer=cvCreateVideoWriter(f,CV_FOURCC('P','I','M','1'),fps,cvSize(frameW,frameH),isColor);
 
+  //Start recording the sound
   FILE* soundProc = popen(soundCommand, "r");
-  printf("Grabando audio");
+
+  //Defining imaging call back
   image_transport::CameraSubscriber sub = it.subscribeCamera(topic, 1, &callback);
+
+  //Ros spin, callback will be used to record images
   ros::spin();
+
+  //Closing the video File
   cvReleaseVideoWriter(&writer);
+  
+  //Closing record audio command
   pclose(soundProc);
   printf("File Closed\n");
+  printf("Starting combining files\n");
+ 
+  //Combining  audio and video command
+  FILE* combProc = popen(combiCommand, "r");
+  char buffer[1028];
+  while (fgets(buffer, 1028, combProc) != NULL)
+  {
+  }
+  pclose(combProc);
+
+  //Removing audio and video files
+  FILE* removeProc = popen(removeCommand, "r");
+  while (fgets(buffer, 1028, removeProc) != NULL)
+  {
+  }
+  pclose(removeProc);
+ 
 }
