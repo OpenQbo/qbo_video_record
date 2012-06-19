@@ -35,6 +35,8 @@ sensor_msgs::CvBridge g_bridge;
 
 std::string directory = "/home/qboblue/Pictures/";
 std::string extension=".avi";
+std::string soundRecorder="arecord";
+std::string sExtension=".wav";
 int isColor = 1;
 int fps     = 30; 
 int frameW  = 480; 
@@ -71,9 +73,16 @@ int main(int argc, char** argv)
   std::string file=directory+filename+extension;
   const char * f=file.c_str();
 
+  std::string sound=soundRecorder+" "+directory+filename+sExtension;
+  const char * soundCommand=sound.c_str();
+
   writer=cvCreateVideoWriter(f,CV_FOURCC('P','I','M','1'),fps,cvSize(frameW,frameH),isColor);
+
+  FILE* soundProc = popen(soundCommand, "r");
+  printf("Grabando audio");
   image_transport::CameraSubscriber sub = it.subscribeCamera(topic, 1, &callback);
   ros::spin();
   cvReleaseVideoWriter(&writer);
+  pclose(soundProc);
   printf("File Closed\n");
 }
