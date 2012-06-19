@@ -33,7 +33,7 @@
 
 sensor_msgs::CvBridge g_bridge;
 
-std::string defaultDirectory = "/home/qboblue/Pictures/";
+std::string defaultDirectory = "/home/qboblue/Videos/";
 std::string defaultTopic="/stereo/left/image_raw";
 std::string extension=".avi";
 std::string soundRecorder="arecord";
