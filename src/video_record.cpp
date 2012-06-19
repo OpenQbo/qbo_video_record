@@ -28,14 +28,18 @@
 #include <ros/ros.h>
 #include <cv_bridge/CvBridge.h>
 #include <image_transport/image_transport.h>
+#include <string>
+#include <iostream>
 
 sensor_msgs::CvBridge g_bridge;
 
+std::string directory = "/home/qboblue/Pictures/";
+std::string extension=".avi";
 int isColor = 1;
 int fps     = 30; 
 int frameW  = 480; 
 int frameH  = 320;
-CvVideoWriter *writer=cvCreateVideoWriter("out.avi",CV_FOURCC('P','I','M','1'),fps,cvSize(frameW,frameH),isColor);
+CvVideoWriter *writer;
 
 
 void callback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::CameraInfoConstPtr& info)
@@ -58,6 +62,16 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
   image_transport::ImageTransport it(nh);
   std::string topic = nh.resolveName("image");
+
+
+  int now=time(0);
+  std::stringstream sstr;
+  sstr << now;
+  std::string filename=sstr.str();
+  std::string file=directory+filename+extension;
+  const char * f=file.c_str();
+
+  writer=cvCreateVideoWriter(f,CV_FOURCC('P','I','M','1'),fps,cvSize(frameW,frameH),isColor);
   image_transport::CameraSubscriber sub = it.subscribeCamera(topic, 1, &callback);
   ros::spin();
   cvReleaseVideoWriter(&writer);
