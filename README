@@ -15,7 +15,7 @@ rosmake
 
 === Run ===
 
-rosrun qbo_system_info plugin_system.py
+rosrun qbo_video_record video_record
 
 === Arvhive Contents ===
 
