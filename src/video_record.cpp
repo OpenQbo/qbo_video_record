@@ -30,6 +30,7 @@
 #include <image_transport/image_transport.h>
 #include <string>
 #include <iostream>
+#include <signal.h>
 
 sensor_msgs::CvBridge g_bridge;
 
@@ -46,7 +47,10 @@ int fps     = 30;
 int frameW  = 480; 
 int frameH  = 320;
 CvVideoWriter *writer;
-
+FILE* soundProc;
+std::string directory;
+std::string filename;
+pid_t pID;
 
 void callback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::CameraInfoConstPtr& info)
 {
@@ -62,14 +66,57 @@ void callback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::Camera
     ROS_ERROR("Unable to convert %s image to bgr8", image->encoding.c_str());
 }
 
+void endProgram()
+{
+  cvReleaseVideoWriter(&writer);
+
+  //Set combining command, filename and directory
+  std::string combi=combinator+" "+directory+filename+finalExtension+" "+directory+filename+sExtension+" "+directory+filename+extension;
+  const char * combiCommand=combi.c_str();
+
+  //Set remove command
+  std::string rm=deleter+" "+directory+filename+sExtension+" "+directory+filename+extension;
+  const char * removeCommand=rm.c_str();
+
+  //Closing record audio command
+  kill( pID, SIGKILL );
+  printf("File Closed\n");
+  printf("Starting combining files\n");
+
+  //Combining  audio and video command
+  FILE* combProc = popen(combiCommand, "r");
+  char buffer[1028];
+  while (fgets(buffer, 1028, combProc) != NULL)
+  {
+  }
+  pclose(combProc);
+
+  //Removing audio and video files
+  FILE* removeProc = popen(removeCommand, "r");
+  while (fgets(buffer, 1028, removeProc) != NULL)
+  {
+  }
+  pclose(removeProc);
+}
+
+
+void finishRecord(int sig)
+{
+   ros::shutdown();
+   printf("Signal captured\n");
+   endProgram();
+   printf("Ended Program");
+   exit(0);
+}
+
 int main(int argc, char** argv)
 {
   //Init ROS
-  ros::init(argc, argv, "qbo_record_video", ros::init_options::AnonymousName);
+  ros::init(argc, argv, "qbo_record_video", ros::init_options::NoSigintHandler);
   ros::NodeHandle nh;
   image_transport::ImageTransport it(nh);
   std::string topic = nh.resolveName("image");
-  std::string directory= nh.resolveName("recordDir");
+  directory= nh.resolveName("recordDir");
   if (topic=="/image"){
     topic=defaultTopic;
   }
@@ -81,34 +128,54 @@ int main(int argc, char** argv)
   int now=time(0);
   std::stringstream sstr;
   sstr << now;
-  std::string filename=sstr.str();
+  filename=sstr.str();
   std::string file=directory+filename+extension;
   const char * f=file.c_str();
 
   //Set audio command, file name and directory
-  std::string sound=soundRecorder+" "+directory+filename+sExtension;
-  const char * soundCommand=sound.c_str();
+//  std::string sound=soundRecorder+" "+directory+filename+sExtension;
+//  const char * soundCommand=sound.c_str();
 
   //Set combining command, filename and directory
-  std::string combi=combinator+" "+directory+filename+finalExtension+" "+directory+filename+sExtension+" "+directory+filename+extension;
-  const char * combiCommand=combi.c_str();
+//  std::string combi=combinator+" "+directory+filename+finalExtension+" "+directory+filename+sExtension+" "+directory+filename+extension;
+//  const char * combiCommand=combi.c_str();
 
   //Set remove command
-  std::string rm=deleter+" "+directory+filename+sExtension+" "+directory+filename+extension;
-  const char * removeCommand=rm.c_str();
+//  std::string rm=deleter+" "+directory+filename+sExtension+" "+directory+filename+extension;
+//  const char * removeCommand=rm.c_str();
 
   //Define Video file
   writer=cvCreateVideoWriter(f,CV_FOURCC('P','I','M','1'),fps,cvSize(frameW,frameH),isColor);
 
-  //Start recording the sound
-  FILE* soundProc = popen(soundCommand, "r");
 
-  //Defining imaging call back
-  image_transport::CameraSubscriber sub = it.subscribeCamera(topic, 1, &callback);
+  pID = fork();
+  if (pID == 0)                // child
+  {
+      //Set audio command, file name and directory
+      std::string sound=soundRecorder+" "+directory+filename+sExtension;
+      const char * soundCommand=sound.c_str();
+      //Start recording the sound
+      soundProc = popen(soundCommand, "r");
+      pclose(soundProc);
+  }
+  else
+  {
+      //Captur SIGINT
+      signal(SIGINT,&finishRecord);
 
-  //Ros spin, callback will be used to record images
-  ros::spin();
+      //Defining imaging call back
+      image_transport::CameraSubscriber sub = it.subscribeCamera(topic, 1, &callback);
 
+      //Ros spin, callback will be used to record images
+      ros::spin();
+    /*  while (1){
+      sleep(1);
+      printf("1 Second");
+  }*/
+      printf("Ending program");
+      endProgram();
+  }
+/*
   //Closing the video File
   cvReleaseVideoWriter(&writer);
   
@@ -131,5 +198,5 @@ int main(int argc, char** argv)
   {
   }
   pclose(removeProc);
- 
+ */
 }
