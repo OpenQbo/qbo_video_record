@@ -132,18 +132,6 @@ int main(int argc, char** argv)
   std::string file=directory+filename+extension;
   const char * f=file.c_str();
 
-  //Set audio command, file name and directory
-//  std::string sound=soundRecorder+" "+directory+filename+sExtension;
-//  const char * soundCommand=sound.c_str();
-
-  //Set combining command, filename and directory
-//  std::string combi=combinator+" "+directory+filename+finalExtension+" "+directory+filename+sExtension+" "+directory+filename+extension;
-//  const char * combiCommand=combi.c_str();
-
-  //Set remove command
-//  std::string rm=deleter+" "+directory+filename+sExtension+" "+directory+filename+extension;
-//  const char * removeCommand=rm.c_str();
-
   //Define Video file
   writer=cvCreateVideoWriter(f,CV_FOURCC('P','I','M','1'),fps,cvSize(frameW,frameH),isColor);
 
@@ -168,35 +156,8 @@ int main(int argc, char** argv)
 
       //Ros spin, callback will be used to record images
       ros::spin();
-    /*  while (1){
-      sleep(1);
-      printf("1 Second");
-  }*/
+
       printf("Ending program");
       endProgram();
   }
-/*
-  //Closing the video File
-  cvReleaseVideoWriter(&writer);
-  
-  //Closing record audio command
-  pclose(soundProc);
-  printf("File Closed\n");
-  printf("Starting combining files\n");
- 
-  //Combining  audio and video command
-  FILE* combProc = popen(combiCommand, "r");
-  char buffer[1028];
-  while (fgets(buffer, 1028, combProc) != NULL)
-  {
-  }
-  pclose(combProc);
-
-  //Removing audio and video files
-  FILE* removeProc = popen(removeCommand, "r");
-  while (fgets(buffer, 1028, removeProc) != NULL)
-  {
-  }
-  pclose(removeProc);
- */
 }
