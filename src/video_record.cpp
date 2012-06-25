@@ -26,13 +26,13 @@
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 #include <ros/ros.h>
-#include <cv_bridge/CvBridge.h>
+#include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
+#include <sensor_msgs/image_encodings.h>
 #include <string>
 #include <iostream>
 #include <signal.h>
 
-sensor_msgs::CvBridge g_bridge;
 
 std::string defaultDirectory = "/home/qboblue/Videos/";
 std::string defaultTopic="/stereo/left/image_raw";
@@ -46,7 +46,7 @@ int isColor = 1;
 int fps     = 30; 
 int frameW  = 480; 
 int frameH  = 320;
-CvVideoWriter *writer;
+cv::VideoWriter *writer;
 FILE* soundProc;
 std::string directory;
 std::string filename;
@@ -54,21 +54,22 @@ pid_t pID;
 
 void callback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::CameraInfoConstPtr& info)
 {
-  if (g_bridge.fromImage(*image, "bgr8")) {
-    IplImage *image = g_bridge.toIpl();
-    if (image) {
-      cvWriteFrame(writer, image);
-    } else {
-      ROS_WARN("Couldn't save image, no data!");
+    cv_bridge::CvImagePtr cv_ptr;
+    try
+    {
+        cv_ptr = cv_bridge::toCvCopy(image, sensor_msgs::image_encodings::RGB8);
     }
-  }
-  else
-    ROS_ERROR("Unable to convert %s image to bgr8", image->encoding.c_str());
+    catch (cv_bridge::Exception& e)
+    {
+        ROS_ERROR("cv_bridge exception: %s", e.what());
+        return;
+    }
+    *writer <<  cv_ptr->image;
 }
 
 void endProgram()
 {
-  cvReleaseVideoWriter(&writer);
+//  cvReleaseVideoWriter(&writer);
 
   //Set combining command, filename and directory
   std::string combi=combinator+" "+directory+filename+finalExtension+" "+directory+filename+sExtension+" "+directory+filename+extension;
@@ -130,10 +131,9 @@ int main(int argc, char** argv)
   sstr << now;
   filename=sstr.str();
   std::string file=directory+filename+extension;
-  const char * f=file.c_str();
 
   //Define Video file
-  writer=cvCreateVideoWriter(f,CV_FOURCC('P','I','M','1'),fps,cvSize(frameW,frameH),isColor);
+  writer=new cv::VideoWriter(file, CV_FOURCC('D','I','V','X'), fps, cv::Size(frameW,frameH), true);
 
 
   pID = fork();
