@@ -124,6 +124,9 @@ int main(int argc, char** argv)
   if (directory=="/recordDir"){
     directory=defaultDirectory;
   }
+  else  {
+      directory=directory+"/";
+  }
   printf("We will record this video topic: '%s' and the destination: %s\n",topic.c_str(), directory.c_str());
   //Set Video file name and directory
   int now=time(0);
