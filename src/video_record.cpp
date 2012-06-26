@@ -39,8 +39,8 @@ std::string defaultTopic="/stereo/left/image_raw";
 std::string extension=".avi";
 std::string soundRecorder="arecord";
 std::string sExtension=".wav";
-std::string combinator="mkvmerge -o ";
-std::string finalExtension=".mkv";
+std::string combinator="ffmpeg ";
+std::string finalExtension=".ogv";
 std::string deleter="rm";
 int isColor = 1;
 int fps     = 30; 
@@ -72,7 +72,7 @@ void endProgram()
 //  cvReleaseVideoWriter(&writer);
 
   //Set combining command, filename and directory
-  std::string combi=combinator+" "+directory+filename+finalExtension+" "+directory+filename+sExtension+" "+directory+filename+extension;
+  std::string combi=combinator+" -i "+directory+filename+sExtension+" -i "+directory+filename+extension + " -vcodec libtheora -b 700k -y " + directory+filename+finalExtension;
   const char * combiCommand=combi.c_str();
 
   //Set remove command
