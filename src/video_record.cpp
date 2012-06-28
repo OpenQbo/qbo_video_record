@@ -30,7 +30,7 @@
 #include <string>
 #include <iostream>
 #include <signal.h>
-#include "qbo_video_record/StarRecord.h"
+#include "qbo_video_record/StartRecord.h"
 #include "qbo_video_record/StopRecord.h"
 #include "qbo_video_record/StatusRecord.h"
 
@@ -69,8 +69,8 @@ void recordCallback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::
     *writer <<  cv_ptr->image;
 }
 
-bool startServiceCallBack(qbo_video_record::StarRecord::Request  &req,
-         qbo_video_record::StarRecord::Response &res )
+bool startServiceCallBack(qbo_video_record::StartRecord::Request  &req,
+         qbo_video_record::StartRecord::Response &res )
 {
   ROS_INFO("Service Called");
   ROS_INFO("Recived:Start");
@@ -102,11 +102,8 @@ bool startServiceCallBack(qbo_video_record::StarRecord::Request  &req,
     if (pID == 0)                // child
     {
         std::string sound=soundRecorder+" "+directory+filename+sExtension;
-        std::string test=directory+filename+sExtension;
-        const char * soundCommand=sound.c_str();
-        ROS_INFO("Creo el proceso de grabacion de audio");
-        int newpid=execl(soundRecorder.c_str(),soundRecorder.c_str(),test.c_str(), NULL);
-        ROS_INFO("----------------Creado pid= %d",newpid);
+        std::string params=directory+filename+sExtension;
+        int newpid=execl(soundRecorder.c_str(),soundRecorder.c_str(),params.c_str(), NULL);
         exit(1);
     }
     else
