@@ -18,9 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
  * MA 02110-1301, USA.
  *
- * Authors: Arturo Bajuelos <arturo@openqbo.com>; 
- *          Sergio Merino <s.merino@openqbo.com>;
- *          etc.
+ * Authors:    Sergio Merino <s.merino@openqbo.com>;
  */
 
 #include <opencv/cv.h>
@@ -32,16 +30,20 @@
 #include <string>
 #include <iostream>
 #include <signal.h>
+#include "qbo_video_record/StarRecord.h"
+#include "qbo_video_record/StopRecord.h"
+#include "qbo_video_record/StatusRecord.h"
 
-
+ros::NodeHandle *pNh;
 std::string defaultDirectory = "/home/qboblue/Videos/";
 std::string defaultTopic="/stereo/left/image_raw";
 std::string extension=".avi";
-std::string soundRecorder="arecord";
+std::string soundRecorder="/usr/bin/arecord";
 std::string sExtension=".wav";
 std::string combinator="ffmpeg ";
 std::string finalExtension=".ogv";
 std::string deleter="rm";
+int status = 0;
 int isColor = 1;
 int fps     = 30; 
 int frameW  = 480; 
@@ -52,7 +54,7 @@ std::string directory;
 std::string filename;
 pid_t pID;
 
-void callback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::CameraInfoConstPtr& info)
+void recordCallback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::CameraInfoConstPtr& info)
 {
     cv_bridge::CvImagePtr cv_ptr;
     try
@@ -67,100 +69,125 @@ void callback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::Camera
     *writer <<  cv_ptr->image;
 }
 
-void endProgram()
+bool startServiceCallBack(qbo_video_record::StarRecord::Request  &req,
+         qbo_video_record::StarRecord::Response &res )
 {
-//  cvReleaseVideoWriter(&writer);
+  ROS_INFO("Service Called");
+  ROS_INFO("Recived:Start");
+  if (status==0){
+    status=1;
+    image_transport::ImageTransport it(*pNh);
+    std::string topic = req.imageTopic;
+    directory= req.directory;
+    if (topic==""){
+      topic=defaultTopic;
+    }
+    if (directory==""){
+      directory=defaultDirectory;
+    }
+    else  {
+      directory=directory+"/";
+    }
+    //Set Video file name and directory
+    int now=time(0);
+    std::stringstream sstr;
+    sstr << now;
+    filename=sstr.str();
+    std::string file=directory+filename+extension;
 
+  //Define Video file
+    writer=new cv::VideoWriter(file, CV_FOURCC('D','I','V','X'), fps, cv::Size(frameW,frameH), true);
+
+    pID = vfork();
+    if (pID == 0)                // child
+    {
+        std::string sound=soundRecorder+" "+directory+filename+sExtension;
+        std::string test=directory+filename+sExtension;
+        const char * soundCommand=sound.c_str();
+        ROS_INFO("Creo el proceso de grabacion de audio");
+        int newpid=execl(soundRecorder.c_str(),soundRecorder.c_str(),test.c_str(), NULL);
+        ROS_INFO("----------------Creado pid= %d",newpid);
+        exit(1);
+    }
+    else
+    {
+      //Defining imaging callback
+      image_transport::CameraSubscriber sub = it.subscribeCamera(topic, 1, &recordCallback);
+    }
+    res.result=true;
+  }
+  else{
+    res.result=false;
+  }
+  return true;
+}
+
+bool stopServiceCallBack(qbo_video_record::StopRecord::Request  &req,
+         qbo_video_record::StopRecord::Response &res )
+{
+  ROS_INFO("Service Called");
+  ROS_INFO("Recived:Stop");
+//  cvReleaseVideoWriter(&writer);
+  if (status==1)
+  {
+    status=0;
   //Set combining command, filename and directory
-  std::string combi=combinator+" -i "+directory+filename+sExtension+" -i "+directory+filename+extension + " -vcodec libtheora -b 700k -y " + directory+filename+finalExtension;
-  const char * combiCommand=combi.c_str();
+    std::string combi=combinator+" -i "+directory+filename+sExtension+" -i "+directory+filename+extension + " -vcodec libtheora -b 700k -y " + directory+filename+finalExtension;
+    const char * combiCommand=combi.c_str();
 
   //Set remove command
-  std::string rm=deleter+" "+directory+filename+sExtension+" "+directory+filename+extension;
-  const char * removeCommand=rm.c_str();
+    std::string rm=deleter+" "+directory+filename+sExtension+" "+directory+filename+extension;
+    const char * removeCommand=rm.c_str();
 
   //Closing record audio command
-  kill( pID, SIGKILL );
-  printf("File Closed\n");
-  printf("Starting combining files\n");
+    ROS_INFO("I have to kill: %d",pID);
+    ROS_INFO("RETURN %d.",kill( pID, SIGKILL ));
+    ROS_INFO("THIS ERROR: %d",errno);
+//    waitpid(pID, NULL, 0);
+    printf("File Closed\n");
+    printf("Starting combining files\n");
 
   //Combining  audio and video command
-  FILE* combProc = popen(combiCommand, "r");
-  char buffer[1028];
-  while (fgets(buffer, 1028, combProc) != NULL)
-  {
-  }
-  pclose(combProc);
+    FILE* combProc = popen(combiCommand, "r");
+    char buffer[1028];
+    while (fgets(buffer, 1028, combProc) != NULL)
+    {
+    }
+    pclose(combProc);
 
   //Removing audio and video files
-  FILE* removeProc = popen(removeCommand, "r");
-  while (fgets(buffer, 1028, removeProc) != NULL)
-  {
+    FILE* removeProc = popen(removeCommand, "r");
+    while (fgets(buffer, 1028, removeProc) != NULL)
+    {
+    }
+    pclose(removeProc);
+    res.result=true;
   }
-  pclose(removeProc);
+  else{
+    res.result=false;
+  }
+  return true;
 }
 
-
-void finishRecord(int sig)
+bool statusServiceCallBack(qbo_video_record::StatusRecord::Request  &req,
+         qbo_video_record::StatusRecord::Response &res )
 {
-   ros::shutdown();
-   printf("Signal captured\n");
-   endProgram();
-   printf("Ended Program");
-   exit(0);
+  ROS_INFO("Service Called");
+  ROS_INFO("Recived:Status");
+  res.status=status;
+  return true;
 }
+
 
 int main(int argc, char** argv)
 {
-  //Init ROS
   ros::init(argc, argv, "qbo_record_video", ros::init_options::NoSigintHandler);
-  ros::NodeHandle nh;
-  image_transport::ImageTransport it(nh);
-  std::string topic = nh.resolveName("image");
-  directory= nh.resolveName("recordDir");
-  if (topic=="/image"){
-    topic=defaultTopic;
-  }
-  if (directory=="/recordDir"){
-    directory=defaultDirectory;
-  }
-  else  {
-      directory=directory+"/";
-  }
-  printf("We will record this video topic: '%s' and the destination: %s\n",topic.c_str(), directory.c_str());
-  //Set Video file name and directory
-  int now=time(0);
-  std::stringstream sstr;
-  sstr << now;
-  filename=sstr.str();
-  std::string file=directory+filename+extension;
+  pNh=new ros::NodeHandle;
+  ros::ServiceServer startService = pNh->advertiseService("/qbo_video_record/start",startServiceCallBack);
+  ros::ServiceServer stopService = pNh->advertiseService("/qbo_video_record/stop",stopServiceCallBack);
+  ros::ServiceServer statusService = pNh->advertiseService("/qbo_video_record/status",statusServiceCallBack);
+  ROS_INFO("Waiting Server");
+  ros::spin();
+  return 0;
 
-  //Define Video file
-  writer=new cv::VideoWriter(file, CV_FOURCC('D','I','V','X'), fps, cv::Size(frameW,frameH), true);
-
-
-  pID = fork();
-  if (pID == 0)                // child
-  {
-      //Set audio command, file name and directory
-      std::string sound=soundRecorder+" "+directory+filename+sExtension;
-      const char * soundCommand=sound.c_str();
-      //Start recording the sound
-      soundProc = popen(soundCommand, "r");
-      pclose(soundProc);
-  }
-  else
-  {
-      //Captur SIGINT
-      signal(SIGINT,&finishRecord);
-
-      //Defining imaging call back
-      image_transport::CameraSubscriber sub = it.subscribeCamera(topic, 1, &callback);
-
-      //Ros spin, callback will be used to record images
-      ros::spin();
-
-      printf("Ending program");
-      endProgram();
-  }
 }
