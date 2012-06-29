@@ -33,6 +33,7 @@
 #include "qbo_video_record/StartRecord.h"
 #include "qbo_video_record/StopRecord.h"
 #include "qbo_video_record/StatusRecord.h"
+#include <boost/thread.hpp>
 
 ros::NodeHandle *pNh;
 std::string defaultDirectory = "/home/qboblue/Videos/";
@@ -48,18 +49,22 @@ int isColor = 1;
 int fps     = 30; 
 int frameW  = 480; 
 int frameH  = 320;
+
+ros::Subscriber sub;
 cv::VideoWriter *writer;
 FILE* soundProc;
 std::string directory;
 std::string filename;
 pid_t pID;
 
-void recordCallback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::CameraInfoConstPtr& info)
+using namespace boost;
+
+void recordCallback(const sensor_msgs::Image::ConstPtr& image_ptr)
 {
     cv_bridge::CvImagePtr cv_ptr;
     try
     {
-        cv_ptr = cv_bridge::toCvCopy(image, sensor_msgs::image_encodings::BGR8);
+        cv_ptr = cv_bridge::toCvCopy(image_ptr, sensor_msgs::image_encodings::BGR8);
     }
     catch (cv_bridge::Exception& e)
     {
@@ -109,7 +114,7 @@ bool startServiceCallBack(qbo_video_record::StartRecord::Request  &req,
       //Define Video file
       writer=new cv::VideoWriter(file, CV_FOURCC('D','I','V','X'), fps, cv::Size(frameW,frameH), true);
       //Defining imaging callback
-      image_transport::CameraSubscriber sub = it.subscribeCamera(topic, 1, &recordCallback);
+      sub = pNh->subscribe<sensor_msgs::Image>(topic,1,&recordCallback); 
     }
     res.result=true;
   }
@@ -119,20 +124,9 @@ bool startServiceCallBack(qbo_video_record::StartRecord::Request  &req,
   return true;
 }
 
-bool stopServiceCallBack(qbo_video_record::StopRecord::Request  &req,
-         qbo_video_record::StopRecord::Response &res )
+void combineAudioVideo()
 {
-  ROS_INFO("Service Called");
-  ROS_INFO("Recived:Stop");
-//  cvReleaseVideoWriter(&writer);
-  if (status==1)
-  {
-    status=0;
-    int pID = fork();
-    if (pID == 0)                // child
-    {
-      //Set combining command, filename and directory
-      std::string combi=combinator+" -i "+directory+filename+sExtension+" -i "+directory+filename+extension + " -vcodec libtheora -b 700k -y " + directory+filename+finalExtension;
+      std::string combi=combinator+" -i "+directory+filename+sExtension+" -i "+directory+filename+extension + " -vcodec libtheora -f ogg -acodec libvorbis -ar 22050 -y " + directory+filename+finalExtension;
       const char * combiCommand=combi.c_str();
 
       //Set remove command
@@ -144,19 +138,29 @@ bool stopServiceCallBack(qbo_video_record::StopRecord::Request  &req,
       while (fgets(buffer, 1028, combProc) != NULL)
       {
       }
+      ROS_INFO("End Combining");
       pclose(combProc);
-
       //Removing audio and video files
       FILE* removeProc = popen(removeCommand, "r");
       while (fgets(buffer, 1028, removeProc) != NULL)
       {
       }
       pclose(removeProc);
-    }
-    else
-    {
-      res.result=true;
-    }
+}
+
+bool stopServiceCallBack(qbo_video_record::StopRecord::Request  &req,
+         qbo_video_record::StopRecord::Response &res )
+{
+  ROS_INFO("Service Called");
+  ROS_INFO("Recived:Stop");
+//  cvReleaseVideoWriter(&writer);
+  if (status==1)
+  {
+    status=0;
+    kill( pID, SIGKILL );
+    sub.shutdown();
+    thread thread_1 = thread(combineAudioVideo);
+    res.result=true;
   }
   else{
     res.result=false;
