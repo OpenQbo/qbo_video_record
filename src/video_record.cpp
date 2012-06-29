@@ -95,19 +95,19 @@ bool startServiceCallBack(qbo_video_record::StartRecord::Request  &req,
     filename=sstr.str();
     std::string file=directory+filename+extension;
 
-  //Define Video file
-    writer=new cv::VideoWriter(file, CV_FOURCC('D','I','V','X'), fps, cv::Size(frameW,frameH), true);
 
     pID = vfork();
     if (pID == 0)                // child
     {
         std::string sound=soundRecorder+" "+directory+filename+sExtension;
         std::string params=directory+filename+sExtension;
-        int newpid=execl(soundRecorder.c_str(),soundRecorder.c_str(),params.c_str(), NULL);
+        execl(soundRecorder.c_str(),soundRecorder.c_str(),params.c_str(), NULL);
         exit(1);
     }
     else
     {
+      //Define Video file
+      writer=new cv::VideoWriter(file, CV_FOURCC('D','I','V','X'), fps, cv::Size(frameW,frameH), true);
       //Defining imaging callback
       image_transport::CameraSubscriber sub = it.subscribeCamera(topic, 1, &recordCallback);
     }
@@ -128,37 +128,35 @@ bool stopServiceCallBack(qbo_video_record::StopRecord::Request  &req,
   if (status==1)
   {
     status=0;
-  //Set combining command, filename and directory
-    std::string combi=combinator+" -i "+directory+filename+sExtension+" -i "+directory+filename+extension + " -vcodec libtheora -b 700k -y " + directory+filename+finalExtension;
-    const char * combiCommand=combi.c_str();
-
-  //Set remove command
-    std::string rm=deleter+" "+directory+filename+sExtension+" "+directory+filename+extension;
-    const char * removeCommand=rm.c_str();
-
-  //Closing record audio command
-    ROS_INFO("I have to kill: %d",pID);
-    ROS_INFO("RETURN %d.",kill( pID, SIGKILL ));
-    ROS_INFO("THIS ERROR: %d",errno);
-//    waitpid(pID, NULL, 0);
-    printf("File Closed\n");
-    printf("Starting combining files\n");
-
-  //Combining  audio and video command
-    FILE* combProc = popen(combiCommand, "r");
-    char buffer[1028];
-    while (fgets(buffer, 1028, combProc) != NULL)
+    int pID = fork();
+    if (pID == 0)                // child
     {
-    }
-    pclose(combProc);
+      //Set combining command, filename and directory
+      std::string combi=combinator+" -i "+directory+filename+sExtension+" -i "+directory+filename+extension + " -vcodec libtheora -b 700k -y " + directory+filename+finalExtension;
+      const char * combiCommand=combi.c_str();
 
-  //Removing audio and video files
-    FILE* removeProc = popen(removeCommand, "r");
-    while (fgets(buffer, 1028, removeProc) != NULL)
-    {
+      //Set remove command
+      std::string rm=deleter+" "+directory+filename+sExtension+" "+directory+filename+extension;
+      const char * removeCommand=rm.c_str();
+
+      FILE* combProc = popen(combiCommand, "r");
+      char buffer[1028];
+      while (fgets(buffer, 1028, combProc) != NULL)
+      {
+      }
+      pclose(combProc);
+
+      //Removing audio and video files
+      FILE* removeProc = popen(removeCommand, "r");
+      while (fgets(buffer, 1028, removeProc) != NULL)
+      {
+      }
+      pclose(removeProc);
     }
-    pclose(removeProc);
-    res.result=true;
+    else
+    {
+      res.result=true;
+    }
   }
   else{
     res.result=false;
