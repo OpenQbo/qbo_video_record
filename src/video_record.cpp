@@ -36,6 +36,7 @@
 #include <boost/thread.hpp>
 
 ros::NodeHandle *pNh;
+std::string tempDir= "/tmp/";
 std::string defaultDirectory = "/home/qboblue/Videos/";
 std::string defaultTopic="/stereo/left/image_raw";
 std::string extension=".avi";
@@ -98,14 +99,14 @@ bool startServiceCallBack(qbo_video_record::StartRecord::Request  &req,
     std::stringstream sstr;
     sstr << now;
     filename=sstr.str();
-    std::string file=directory+filename+extension;
+    std::string file=tempDir+filename+extension;
 
 
     pID = vfork();
     if (pID == 0)                // child
     {
-        std::string sound=soundRecorder+" "+directory+filename+sExtension;
-        std::string params=directory+filename+sExtension;
+        std::string sound=soundRecorder+" "+tempDir+filename+sExtension;
+        std::string params=tempDir+filename+sExtension;
         execl(soundRecorder.c_str(),soundRecorder.c_str(),params.c_str(), NULL);
         exit(1);
     }
@@ -126,11 +127,13 @@ bool startServiceCallBack(qbo_video_record::StartRecord::Request  &req,
 
 void combineAudioVideo()
 {
-      std::string combi=combinator+" -i "+directory+filename+sExtension+" -i "+directory+filename+extension + " -vcodec libtheora -f ogg -acodec libvorbis -ar 22050 -y " + directory+filename+finalExtension;
+      std::string tempFile=tempDir+filename+finalExtension;
+      std::string finalFilename=directory+filename+finalExtension;
+      std::string combi=combinator+" -i "+tempDir+filename+sExtension+" -i "+tempDir+filename+extension + " -vcodec libtheora -f ogg -acodec libvorbis -ar 22050 -y " + tempFile;
       const char * combiCommand=combi.c_str();
 
       //Set remove command
-      std::string rm=deleter+" "+directory+filename+sExtension+" "+directory+filename+extension;
+      std::string rm=deleter+" "+tempDir+filename+sExtension+" "+tempDir+filename+extension;
       const char * removeCommand=rm.c_str();
 
       FILE* combProc = popen(combiCommand, "r");
@@ -146,6 +149,7 @@ void combineAudioVideo()
       {
       }
       pclose(removeProc);
+      rename(tempFile.c_str(), finalFilename.c_str());
 }
 
 bool stopServiceCallBack(qbo_video_record::StopRecord::Request  &req,
